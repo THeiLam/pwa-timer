@@ -12,198 +12,188 @@ const startSound = document.getElementById('startSound');
 const beepSound = document.getElementById('beepSound');
 const stopSound = document.getElementById('stopSound');
 
-let timerRunning = false;
-let timerPaused = false;
-
-let totalSecondsDefault = 30 * 60;
-let intervalSecondsDefault = 30;
-
-let totalSeconds = totalSecondsDefault;
-let intervalSeconds = intervalSecondsDefault;
-
+let running = false;
+let paused = false;
+let totalSeconds = 30 * 60;
+let intervalSeconds = 30;
 let remainingSeconds = totalSeconds;
-let nextBeepAt = 0; // timestamp when next beep should happen
-let targetEndTime = 0; // timestamp when timer ends
-let tickIntervalId = null;
+let endTime = 0;
+let nextBeepTime = 0;
+let tickId = null;
 
-function formatTime(totalSec) {
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+function formatTime(seconds) {
+  const wholeSeconds = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(wholeSeconds / 60);
+  const secs = wholeSeconds % 60;
+
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-function updateDisplays() {
-  timeDisplay.textContent = formatTime(Math.max(0, Math.ceil(remainingSeconds)));
-  const secToNextBeep = Math.max(0, Math.ceil((nextBeepAt - Date.now()) / 1000));
-  intervalDisplay.textContent = timerRunning && !timerPaused
-    ? `Next beep in: ${secToNextBeep}s`
-    : 'Paused';
+function playSound(audio) {
+  audio.currentTime = 0;
+  audio.play().catch(() => {
+    // The Start button provides the required user interaction.
+  });
 }
 
-function playSound(audioEl) {
-  audioEl.currentTime = 0;
-  const p = audioEl.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch(() => {
-      // Ignore autoplay restrictions; user must interact first.
-    });
+function updateDisplay() {
+  timeDisplay.textContent = formatTime(remainingSeconds);
+
+  if (running && !paused) {
+    const nextBeepIn = Math.max(
+      0,
+      Math.ceil((nextBeepTime - Date.now()) / 1000)
+    );
+
+    intervalDisplay.textContent = `Next beep in: ${nextBeepIn}s`;
+  } else if (paused) {
+    intervalDisplay.textContent = 'Paused';
+  } else {
+    intervalDisplay.textContent = `Next beep in: ${intervalSeconds}s`;
   }
 }
 
-function startTimer() {
-  if (timerRunning && !timerPaused) return;
+function setControls(isRunning) {
+  totalMinInput.disabled = isRunning;
+  intervalSecInput.disabled = isRunning;
+  pauseBtn.disabled = !isRunning || paused;
+}
 
-  // Read settings if starting fresh
-  if (!timerRunning || timerPaused) {
-    totalSecondsDefault = Math.max(1, parseInt(totalMinInput.value || '30', 10)) * 60;
-    intervalSecondsDefault = Math.max(5, parseInt(intervalSecInput.value || '30', 10));
+function readSettings() {
+  const minutes = Number.parseInt(totalMinInput.value, 10);
+  const seconds = Number.parseInt(intervalSecInput.value, 10);
 
-    if (!timerRunning) {
-      totalSeconds = totalSecondsDefault;
-      intervalSeconds = intervalSecondsDefault;
-      remainingSeconds = totalSeconds;
-    }
+  totalSeconds = Math.max(1, Number.isFinite(minutes) ? minutes : 30) * 60;
+  intervalSeconds = Math.max(1, Number.isFinite(seconds) ? seconds : 30);
+}
 
-    const now = Date.now();
-    targetEndTime = now + remainingSeconds * 1000;
-    // Schedule first beep after 'intervalSeconds' from now (or immediately if just resumed?)
-    // For simplicity: always count from current remaining and schedule next beep relative to that.
-    // We'll compute nextBeepAt as now + (remaining % interval) * 1000
-    const elapsed = totalSeconds - remainingSeconds;
-    const timeIntoInterval = elapsed % intervalSeconds;
-    const timeToNextInterval = (intervalSeconds - timeIntoInterval) % intervalSeconds;
-    nextBeepAt = now + (timeToNextInterval || intervalSeconds) * 1000;
-  }
+function startNewTimer() {
+  readSettings();
 
-  timerRunning = true;
-  timerPaused = false;
+  remainingSeconds = totalSeconds;
+  endTime = Date.now() + remainingSeconds * 1000;
+  nextBeepTime = Date.now() + intervalSeconds * 1000;
 
+  running = true;
+  paused = false;
+
+  startBtn.textContent = 'Running';
   startBtn.disabled = true;
-  pauseBtn.disabled = false;
-  totalMinInput.disabled = true;
-  intervalSecInput.disabled = true;
+  setControls(true);
 
   playSound(startSound);
-
-  if (tickIntervalId) clearInterval(tickIntervalId);
-  tickIntervalId = setInterval(tick, 250);
-  updateDisplays();
+  startTicking();
 }
 
-function pauseTimer() {
-  if (!timerRunning || timerPaused) return;
-  timerPaused = true;
+function resumeTimer() {
+  endTime = Date.now() + remainingSeconds * 1000;
+  nextBeepTime = Date.now() + intervalSeconds * 1000;
 
-  if (tickIntervalId) {
-    clearInterval(tickIntervalId);
-    tickIntervalId = null;
-  }
+  running = true;
+  paused = false;
 
-  // Recalculate remaining based on targetEndTime
-  remainingSeconds = Math.max(0, (targetEndTime - Date.now()) / 1000);
+  startBtn.textContent = 'Running';
+  startBtn.disabled = true;
+  setControls(true);
 
-  startBtn.disabled = false;
-  startBtn.textContent = 'Resume';
-  pauseBtn.disabled = true;
-
-  updateDisplays();
+  startTicking();
 }
 
-function resetTimer() {
-  if (tickIntervalId) {
-    clearInterval(tickIntervalId);
-    tickIntervalId = null;
+function startTicking() {
+  stopTicking();
+  tickId = window.setInterval(tick, 250);
+  updateDisplay();
+}
+
+function stopTicking() {
+  if (tickId !== null) {
+    window.clearInterval(tickId);
+    tickId = null;
   }
-
-  timerRunning = false;
-  timerPaused = false;
-
-  totalSecondsDefault = Math.max(1, parseInt(totalMinInput.value || '30', 10)) * 60;
-  intervalSecondsDefault = Math.max(5, parseInt(intervalSecInput.value || '30', 10));
-
-  totalSeconds = totalSecondsDefault;
-  intervalSeconds = intervalSecondsDefault;
-  remainingSeconds = totalSeconds;
-
-  startBtn.disabled = false;
-  startBtn.textContent = 'Start';
-  pauseBtn.disabled = true;
-  totalMinInput.disabled = false;
-  intervalSecInput.disabled = false;
-
-  updateDisplays();
 }
 
 function tick() {
   const now = Date.now();
 
-  // Update remaining based on target end time
-  remainingSeconds = Math.max(0, (targetEndTime - now) / 1000);
+  remainingSeconds = Math.max(0, (endTime - now) / 1000);
 
-  // Check for interval beeps
-  if (now >= nextBeepAt && remainingSeconds > 0.5) {
+  while (now >= nextBeepTime && remainingSeconds > 0) {
     playSound(beepSound);
-    // schedule next beep
-    nextBeepAt = nextBeepAt + intervalSeconds * 1000;
-    // If we paused/resumed, nextBeepAt might be in past; push forward
-    while (nextBeepAt <= now) {
-      nextBeepAt += intervalSeconds * 1000;
-    }
+    nextBeepTime += intervalSeconds * 1000;
   }
 
-  updateDisplays();
+  updateDisplay();
 
-  // Timer finished
-  if (remainingSeconds <= 0.05) {
-    if (tickIntervalId) {
-      clearInterval(tickIntervalId);
-      tickIntervalId = null;
-    }
-    timerRunning = false;
-    timerPaused = false;
-    remainingSeconds = 0;
-    updateDisplays();
-
-    startBtn.disabled = false;
-    startBtn.textContent = 'Start';
-    pauseBtn.disabled = true;
-    totalMinInput.disabled = false;
-    intervalSecInput.disabled = false;
-
-    playSound(stopSound);
+  if (remainingSeconds <= 0) {
+    finishTimer();
   }
 }
 
-// Wire up buttons
+function pauseTimer() {
+  if (!running || paused) {
+    return;
+  }
+
+  remainingSeconds = Math.max(0, (endTime - Date.now()) / 1000);
+  paused = true;
+
+  stopTicking();
+
+  startBtn.disabled = false;
+  startBtn.textContent = 'Resume';
+  pauseBtn.disabled = true;
+
+  updateDisplay();
+}
+
+function finishTimer() {
+  stopTicking();
+
+  running = false;
+  paused = false;
+  remainingSeconds = 0;
+
+  startBtn.disabled = false;
+  startBtn.textContent = 'Start';
+  pauseBtn.disabled = true;
+
+  totalMinInput.disabled = false;
+  intervalSecInput.disabled = false;
+
+  updateDisplay();
+  playSound(stopSound);
+}
+
+function resetTimer() {
+  stopTicking();
+
+  readSettings();
+
+  running = false;
+  paused = false;
+  remainingSeconds = totalSeconds;
+
+  startBtn.disabled = false;
+  startBtn.textContent = 'Start';
+  pauseBtn.disabled = true;
+
+  totalMinInput.disabled = false;
+  intervalSecInput.disabled = false;
+
+  updateDisplay();
+}
+
 startBtn.addEventListener('click', () => {
-  if (!timerRunning) {
-    startTimer();
-  } else if (timerPaused) {
-    // resume
-    const remainingBefore = remainingSeconds;
-    const now = Date.now();
-    targetEndTime = now + remainingBefore * 1000;
-
-    // Recompute next beep based on elapsed fraction
-    const totalElapsedBefore = totalSeconds - remainingBefore;
-    const timeIntoInterval = totalElapsedBefore % intervalSeconds;
-    const timeToNextInterval = (intervalSeconds - timeIntoInterval) % intervalSeconds;
-    nextBeepAt = now + (timeToNextInterval || intervalSeconds) * 1000;
-
-    timerPaused = false;
-    startBtn.disabled = true;
-    pauseBtn.disabled = false;
-    totalMinInput.disabled = true;
-    intervalSecInput.disabled = true;
-
-    if (tickIntervalId) clearInterval(tickIntervalId);
-    tickIntervalId = setInterval(tick, 250);
-    updateDisplays();
+  if (!running) {
+    startNewTimer();
+  } else if (paused) {
+    resumeTimer();
   }
 });
 
 pauseBtn.addEventListener('click', pauseTimer);
 resetBtn.addEventListener('click', resetTimer);
 
-// Initialize display
-updateDisplays();
+readSettings();
+remainingSeconds = totalSeconds;
+updateDisplay();
