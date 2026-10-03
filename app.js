@@ -1,25 +1,24 @@
-const totalMinInput = document.getElementById("totalMin");
-const intervalSecInput = document.getElementById("intervalSec");
+const totalMinInput = document.getElementById('totalMin');
+const intervalSecInput = document.getElementById('intervalSec');
 
-const timeDisplay = document.getElementById("timeDisplay");
-const intervalDisplay = document.getElementById("intervalDisplay");
+const timeDisplay = document.getElementById('timeDisplay');
+const intervalDisplay = document.getElementById('intervalDisplay');
 
-const startBtn = document.getElementById("startBtn");
-const pauseBtn = document.getElementById("pauseBtn");
-const resetBtn = document.getElementById("resetBtn");
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
 
-const soundPlayer = document.getElementById("soundPlayer");
+const soundPlayer = document.getElementById('soundPlayer');
 
 const SOUND_FILES = {
-  start: "./sounds/start.mp3",
-  beep: "./sounds/beep.mp3",
-  stop: "./sounds/stop.mp3",
+  start: './sounds/start.mp3',
+  beep: './sounds/beep.mp3',
+  stop: './sounds/stop.mp3'
 };
 
 let running = false;
 let paused = false;
 let starting = false;
-let audioUnlocked = false;
 
 let totalSeconds = 30 * 60;
 let intervalSeconds = 30;
@@ -34,15 +33,18 @@ function formatTime(seconds) {
   const minutes = Math.floor(wholeSeconds / 60);
   const secs = wholeSeconds % 60;
 
-  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 function readSettings() {
   const minutes = Number.parseInt(totalMinInput.value, 10);
   const seconds = Number.parseInt(intervalSecInput.value, 10);
 
-  const safeMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
-  const safeInterval = Number.isFinite(seconds) && seconds > 0 ? seconds : 30;
+  const safeMinutes =
+    Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
+
+  const safeInterval =
+    Number.isFinite(seconds) && seconds > 0 ? seconds : 30;
 
   totalSeconds = safeMinutes * 60;
   intervalSeconds = safeInterval;
@@ -52,12 +54,12 @@ function updateDisplay() {
   timeDisplay.textContent = formatTime(remainingSeconds);
 
   if (starting) {
-    intervalDisplay.textContent = "Playing start sound...";
+    intervalDisplay.textContent = 'Playing start sound...';
     return;
   }
 
   if (paused) {
-    intervalDisplay.textContent = "Paused";
+    intervalDisplay.textContent = 'Paused';
     return;
   }
 
@@ -110,88 +112,70 @@ async function playSound(name) {
   }
 }
 
-function scheduleCountdownStartAfterSound() {
-  const startCountdown = () => {
-    soundPlayer.removeEventListener("ended", startCountdown);
+function beginCountdown() {
+  const now = Date.now();
 
-    if (!starting) {
-      return;
-    }
+  starting = false;
+  running = true;
+  paused = false;
 
-    const now = Date.now();
+  endTime = now + remainingSeconds * 1000;
+  nextBeepTime = now + intervalSeconds * 1000;
 
-    starting = false;
-    running = true;
-    paused = false;
+  startBtn.textContent = 'Running';
+  startBtn.disabled = true;
+  pauseBtn.disabled = false;
 
-    endTime = now + remainingSeconds * 1000;
-    nextBeepTime = now + intervalSeconds * 1000;
-
-    startBtn.textContent = "Running";
-    startBtn.disabled = true;
-    pauseBtn.disabled = false;
-
-    startTicking();
-  };
-
-  soundPlayer.addEventListener("ended", startCountdown, { once: true });
+  startTicking();
 }
 
-async function startNewTimerFromTap() {
+async function startNewTimer() {
   readSettings();
 
   remainingSeconds = totalSeconds;
+  starting = true;
   running = false;
   paused = false;
-  starting = true;
 
   setInputsDisabled(true);
 
-  startBtn.textContent = "Starting...";
+  startBtn.textContent = 'Starting...';
   startBtn.disabled = true;
   pauseBtn.disabled = true;
 
   updateDisplay();
 
-  scheduleCountdownStartAfterSound();
+  soundPlayer.onended = () => {
+    soundPlayer.onended = null;
 
-  const didStartAudio = await playSound("start");
+    if (starting) {
+      beginCountdown();
+    }
+  };
 
-  if (!didStartAudio) {
-    // Do not leave the app stuck if iPhone/browser blocks audio.
-    starting = false;
+  const didPlay = await playSound('start');
 
-    const now = Date.now();
-    endTime = now + remainingSeconds * 1000;
-    nextBeepTime = now + intervalSeconds * 1000;
-
-    running = true;
-    paused = false;
-
-    startBtn.textContent = "Running";
-    startBtn.disabled = true;
-    pauseBtn.disabled = false;
-
-    startTicking();
+  if (!didPlay) {
+    soundPlayer.onended = null;
+    beginCountdown();
   }
 }
 
 function resumeTimer() {
   const now = Date.now();
 
+  starting = false;
   running = true;
   paused = false;
-  starting = false;
 
   endTime = now + remainingSeconds * 1000;
   nextBeepTime = now + intervalSeconds * 1000;
 
-  startBtn.textContent = "Running";
+  startBtn.textContent = 'Running';
   startBtn.disabled = true;
   pauseBtn.disabled = false;
 
   setInputsDisabled(true);
-
   startTicking();
 }
 
@@ -200,14 +184,17 @@ function pauseTimer() {
     return;
   }
 
-  remainingSeconds = Math.max(0, (endTime - Date.now()) / 1000);
+  remainingSeconds = Math.max(
+    0,
+    (endTime - Date.now()) / 1000
+  );
 
   running = false;
   paused = true;
 
   stopTicking();
 
-  startBtn.textContent = "Resume";
+  startBtn.textContent = 'Resume';
   startBtn.disabled = false;
   pauseBtn.disabled = true;
 
@@ -218,6 +205,7 @@ function resetTimer() {
   stopTicking();
 
   soundPlayer.pause();
+  soundPlayer.onended = null;
   soundPlayer.currentTime = 0;
 
   readSettings();
@@ -230,12 +218,11 @@ function resetTimer() {
   endTime = 0;
   nextBeepTime = 0;
 
-  startBtn.textContent = "Start";
+  startBtn.textContent = 'Start';
   startBtn.disabled = false;
   pauseBtn.disabled = true;
 
   setInputsDisabled(false);
-
   updateDisplay();
 }
 
@@ -245,18 +232,16 @@ function finishTimer() {
   running = false;
   paused = false;
   starting = false;
-
   remainingSeconds = 0;
 
-  startBtn.textContent = "Start";
+  startBtn.textContent = 'Start';
   startBtn.disabled = false;
   pauseBtn.disabled = true;
 
   setInputsDisabled(false);
-
   updateDisplay();
 
-  playSound("stop");
+  playSound('stop');
 }
 
 function tick() {
@@ -266,10 +251,13 @@ function tick() {
 
   const now = Date.now();
 
-  remainingSeconds = Math.max(0, (endTime - now) / 1000);
+  remainingSeconds = Math.max(
+    0,
+    (endTime - now) / 1000
+  );
 
-  while (now >= nextBeepTime && remainingSeconds > 0) {
-    playSound("beep");
+  if (now >= nextBeepTime && remainingSeconds > 0) {
+    playSound('beep');
     nextBeepTime += intervalSeconds * 1000;
   }
 
@@ -280,7 +268,7 @@ function tick() {
   }
 }
 
-startBtn.addEventListener("click", async () => {
+startBtn.addEventListener('click', async () => {
   if (starting) {
     return;
   }
@@ -291,15 +279,14 @@ startBtn.addEventListener("click", async () => {
   }
 
   if (!running) {
-    audioUnlocked = true;
-    await startNewTimerFromTap();
+    await startNewTimer();
   }
 });
 
-pauseBtn.addEventListener("click", pauseTimer);
-resetBtn.addEventListener("click", resetTimer);
+pauseBtn.addEventListener('click', pauseTimer);
+resetBtn.addEventListener('click', resetTimer);
 
-document.addEventListener("visibilitychange", () => {
+document.addEventListener('visibilitychange', () => {
   if (!document.hidden && running && !paused && !starting) {
     tick();
   }
