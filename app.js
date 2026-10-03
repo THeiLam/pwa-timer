@@ -1,16 +1,16 @@
-const totalMinInput = document.getElementById('totalMin');
-const intervalSecInput = document.getElementById('intervalSec');
+const totalMinInput = document.getElementById("totalMin");
+const intervalSecInput = document.getElementById("intervalSec");
 
-const timeDisplay = document.getElementById('timeDisplay');
-const intervalDisplay = document.getElementById('intervalDisplay');
+const timeDisplay = document.getElementById("timeDisplay");
+const intervalDisplay = document.getElementById("intervalDisplay");
 
-const startBtn = document.getElementById('startBtn');
-const pauseBtn = document.getElementById('pauseBtn');
-const resetBtn = document.getElementById('resetBtn');
+const startBtn = document.getElementById("startBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+const resetBtn = document.getElementById("resetBtn");
 
-const startSound = document.getElementById('startSound');
-const beepSound = document.getElementById('beepSound');
-const stopSound = document.getElementById('stopSound');
+const startSound = document.getElementById("startSound");
+const beepSound = document.getElementById("beepSound");
+const stopSound = document.getElementById("stopSound");
 
 let running = false;
 let paused = false;
@@ -26,7 +26,7 @@ function formatTime(seconds) {
   const minutes = Math.floor(wholeSeconds / 60);
   const secs = wholeSeconds % 60;
 
-  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 function playSound(audio) {
@@ -47,7 +47,7 @@ function updateDisplay() {
 
     intervalDisplay.textContent = `Next beep in: ${nextBeepIn}s`;
   } else if (paused) {
-    intervalDisplay.textContent = 'Paused';
+    intervalDisplay.textContent = "Paused";
   } else {
     intervalDisplay.textContent = `Next beep in: ${intervalSeconds}s`;
   }
@@ -71,18 +71,45 @@ function startNewTimer() {
   readSettings();
 
   remainingSeconds = totalSeconds;
-  endTime = Date.now() + remainingSeconds * 1000;
-  nextBeepTime = Date.now() + intervalSeconds * 1000;
-
-  running = true;
+  running = false;
   paused = false;
 
-  startBtn.textContent = 'Running';
   startBtn.disabled = true;
-  setControls(true);
+  startBtn.textContent = "Starting...";
+  pauseBtn.disabled = true;
 
-  playSound(startSound);
-  startTicking();
+  totalMinInput.disabled = true;
+  intervalSecInput.disabled = true;
+
+  updateDisplay();
+
+  startSound.currentTime = 0;
+
+  const beginCountdown = () => {
+    startSound.removeEventListener("ended", beginCountdown);
+
+    const now = Date.now();
+
+    endTime = now + remainingSeconds * 1000;
+    nextBeepTime = now + intervalSeconds * 1000;
+
+    running = true;
+    paused = false;
+
+    startBtn.textContent = "Running";
+    startBtn.disabled = true;
+    setControls(true);
+
+    startTicking();
+  };
+
+  startSound.addEventListener("ended", beginCountdown, { once: true });
+
+  startSound.play().catch(() => {
+    // If the browser cannot play the MP3, do not leave the app stuck.
+    startSound.removeEventListener("ended", beginCountdown);
+    beginCountdown();
+  });
 }
 
 function resumeTimer() {
@@ -92,7 +119,7 @@ function resumeTimer() {
   running = true;
   paused = false;
 
-  startBtn.textContent = 'Running';
+  startBtn.textContent = "Running";
   startBtn.disabled = true;
   setControls(true);
 
@@ -140,7 +167,7 @@ function pauseTimer() {
   stopTicking();
 
   startBtn.disabled = false;
-  startBtn.textContent = 'Resume';
+  startBtn.textContent = "Resume";
   pauseBtn.disabled = true;
 
   updateDisplay();
@@ -154,7 +181,7 @@ function finishTimer() {
   remainingSeconds = 0;
 
   startBtn.disabled = false;
-  startBtn.textContent = 'Start';
+  startBtn.textContent = "Start";
   pauseBtn.disabled = true;
 
   totalMinInput.disabled = false;
@@ -174,7 +201,7 @@ function resetTimer() {
   remainingSeconds = totalSeconds;
 
   startBtn.disabled = false;
-  startBtn.textContent = 'Start';
+  startBtn.textContent = "Start";
   pauseBtn.disabled = true;
 
   totalMinInput.disabled = false;
@@ -183,7 +210,7 @@ function resetTimer() {
   updateDisplay();
 }
 
-startBtn.addEventListener('click', () => {
+startBtn.addEventListener("click", () => {
   if (!running) {
     startNewTimer();
   } else if (paused) {
@@ -191,8 +218,8 @@ startBtn.addEventListener('click', () => {
   }
 });
 
-pauseBtn.addEventListener('click', pauseTimer);
-resetBtn.addEventListener('click', resetTimer);
+pauseBtn.addEventListener("click", pauseTimer);
+resetBtn.addEventListener("click", resetTimer);
 
 readSettings();
 remainingSeconds = totalSeconds;
