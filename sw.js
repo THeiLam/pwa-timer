@@ -1,4 +1,4 @@
-const CACHE_NAME = "pwa-timer-v4";
+const CACHE_NAME = "pwa-timer-v6";
 
 const ASSETS = [
   "./",
@@ -21,15 +21,13 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_NAME)
-            .map((key) => caches.delete(key))
-        )
-      )
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      );
+    })
   );
 
   self.clients.claim();
